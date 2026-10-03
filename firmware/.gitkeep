@@ -1,0 +1,2 @@
+# This file ensures the firmware directory is tracked by git
+# The directory is required by the Containerfile build process
