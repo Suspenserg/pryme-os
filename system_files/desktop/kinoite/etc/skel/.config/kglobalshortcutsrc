@@ -1,0 +1,12 @@
+[ksmserver]
+Lock Session=Alt+L,Meta+L\tScreensaver,Lock Session
+
+[kwin]
+Walk Through Windows=Alt+Tab,Alt+Tab,Walk Through Windows
+Walk Through Windows (Reverse)=Alt+Shift+Tab,Alt+Shift+Backtab,Walk Through Windows (Reverse)
+
+[plasmashell]
+show activity switcher=none,Meta+Q,Show Activity Switcher
+
+[org.kde.plasma.systemmonitor.desktop]
+_launch=Ctrl+Shift+Esc,none,Open System Monitor

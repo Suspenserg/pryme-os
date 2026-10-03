@@ -1,0 +1,68 @@
+#!/usr/bin/bash
+
+# Pryme OS License Activation - GUI
+# Works with both GNOME (zenity) and KDE (kdialog)
+
+HWID=$(/usr/bin/pryme-license hwid | cut -d' ' -f3)
+
+# Detect desktop environment and use appropriate dialog
+if command -v zenity &> /dev/null; then
+    # GNOME - Zenity
+    LICENSE_KEY=$(zenity --entry \
+        --title="Pryme OS - Ativação" \
+        --text="<b>Bem-vindo ao Pryme OS!</b>\n\nPara ativar o sistema, insira sua chave de licença:\n\n<b>Hardware ID:</b> $HWID" \
+        --entry-text="" \
+        --width=500 \
+        --height=200)
+    
+    if [ $? -ne 0 ] || [ -z "$LICENSE_KEY" ]; then
+        zenity --warning \
+            --title="Pryme OS" \
+            --text="Ativação cancelada.\n\nVocê pode ativar mais tarde executando:\nsudo pryme-license activate" \
+            --width=400
+        exit 1
+    fi
+    
+    # Validate license
+    if echo "$LICENSE_KEY" | sudo /usr/bin/pryme-license activate; then
+        zenity --info \
+            --title="Pryme OS - Sucesso!" \
+            --text="<b>Pryme OS ativado com sucesso!</b>\n\nTodos os recursos estão disponíveis." \
+            --width=400
+        exit 0
+    else
+        zenity --error \
+            --title="Pryme OS - Erro" \
+            --text="<b>Falha na ativação</b>\n\nChave de licença inválida.\nPor favor, verifique e tente novamente." \
+            --width=400
+        exit 1
+    fi
+
+elif command -v kdialog &> /dev/null; then
+    # KDE - KDialog
+    LICENSE_KEY=$(kdialog --title "Pryme OS - Ativação" \
+        --inputbox "Bem-vindo ao Pryme OS!\n\nPara ativar o sistema, insira sua chave de licença:\n\nHardware ID: $HWID" \
+        --geometry 500x200)
+    
+    if [ $? -ne 0 ] || [ -z "$LICENSE_KEY" ]; then
+        kdialog --title "Pryme OS" \
+            --msgbox "Ativação cancelada.\n\nVocê pode ativar mais tarde executando:\nsudo pryme-license activate"
+        exit 1
+    fi
+    
+    # Validate license
+    if echo "$LICENSE_KEY" | sudo /usr/bin/pryme-license activate; then
+        kdialog --title "Pryme OS - Sucesso!" \
+            --msgbox "Pryme OS ativado com sucesso!\n\nTodos os recursos estão disponíveis."
+        exit 0
+    else
+        kdialog --title "Pryme OS - Erro" \
+            --error "Falha na ativação\n\nChave de licença inválida.\nPor favor, verifique e tente novamente."
+        exit 1
+    fi
+
+else
+    # Fallback - Terminal
+    echo "No GUI dialog found. Using terminal..."
+    sudo /usr/bin/pryme-license activate
+fi

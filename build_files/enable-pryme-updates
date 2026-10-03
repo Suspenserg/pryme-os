@@ -1,0 +1,26 @@
+#!/usr/bin/bash
+
+# Enable Pryme OS automatic update checking
+
+set -euo pipefail
+
+echo "Enabling Pryme OS update checker..."
+
+# Make script executable
+chmod +x /usr/bin/pryme-update-check
+
+# Create log directory
+mkdir -p /var/log
+touch /var/log/pryme-updates.log
+chmod 644 /var/log/pryme-updates.log
+
+# Create state directory
+mkdir -p /var/lib/pryme
+chmod 755 /var/lib/pryme
+
+# Enable systemd timer
+systemctl enable pryme-update-check.timer
+
+echo "✅ Pryme OS update checker enabled"
+echo "Updates will be checked every 6 hours"
+echo "Logs: /var/log/pryme-updates.log"

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Ativar Pryme OS
+Name[en]=Activate Pryme OS
+Comment=Ativar licença do Pryme OS
+Comment[en]=Activate Pryme OS license
+Icon=dialog-password
+Exec=/usr/bin/pryme-license-gui
+Terminal=false
+Categories=System;Settings;
+Keywords=license;activation;pryme;
+StartupNotify=true

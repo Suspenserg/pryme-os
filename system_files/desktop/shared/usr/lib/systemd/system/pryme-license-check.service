@@ -1,0 +1,18 @@
+[Unit]
+Description=Pryme OS License Validation
+After=network-online.target
+Wants=network-online.target
+Before=graphical.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/pryme-license check
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+# Don't fail boot if license check fails (optional mode)
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=multi-user.target

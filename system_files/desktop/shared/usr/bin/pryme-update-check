@@ -1,0 +1,154 @@
+#!/usr/bin/bash
+
+# Pryme OS - Update Checker
+# Checa atualizações no servidor remoto
+
+set -euo pipefail
+
+API_URL="https://prymesoftwares.vercel.app"
+UPDATE_CHECK_FILE="/var/lib/pryme/last_update_check"
+CURRENT_VERSION=$(grep "VERSION=" /usr/lib/os-release | cut -d'"' -f2)
+OS_VARIANT=$(grep "VARIANT_ID=" /usr/lib/os-release | cut -d'=' -f2 | tr -d '"')
+
+# Criar diretório se não existir
+mkdir -p "$(dirname "$UPDATE_CHECK_FILE")"
+
+# Log
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a /var/log/pryme-updates.log
+}
+
+# Checar se deve verificar atualizações (evita spam)
+should_check() {
+    if [ ! -f "$UPDATE_CHECK_FILE" ]; then
+        return 0
+    fi
+    
+    local last_check=$(stat -c %Y "$UPDATE_CHECK_FILE" 2>/dev/null || echo 0)
+    local current_time=$(date +%s)
+    local time_diff=$((current_time - last_check))
+    
+    # Checar a cada 6 horas (21600 segundos)
+    if [ $time_diff -gt 21600 ]; then
+        return 0
+    fi
+    
+    return 1
+}
+
+# Checar atualizações na API
+check_updates() {
+    log "Checking for Pryme OS updates..."
+    log "Current version: $CURRENT_VERSION"
+    
+    local response=$(curl -s -X POST "$API_URL/v1/updates/check" \
+        -H "Content-Type: application/json" \
+        -d "{\"current_version\": \"$CURRENT_VERSION\", \"os_variant\": \"$OS_VARIANT\"}" \
+        2>/dev/null)
+    
+    if [ $? -ne 0 ]; then
+        log "Error: Failed to connect to update server"
+        return 1
+    fi
+    
+    echo "$response"
+}
+
+# Aplicar atualização
+apply_update() {
+    local latest_version="$1"
+    local download_url="$2"
+    
+    log "Update available: $latest_version"
+    log "Current: $CURRENT_VERSION → New: $latest_version"
+    
+    # Usar rpm-ostree para atualizar
+    if command -v rpm-ostree &> /dev/null; then
+        log "Starting rpm-ostree upgrade..."
+        
+        # Se URL customizada for fornecida, usar rebase
+        if [ -n "$download_url" ] && [[ "$download_url" == ghcr.io* ]]; then
+            log "Rebasing to: $download_url"
+            rpm-ostree rebase "$download_url" 2>&1 | tee -a /var/log/pryme-updates.log
+        else
+            # Atualização normal
+            rpm-ostree upgrade 2>&1 | tee -a /var/log/pryme-updates.log
+        fi
+        
+        if [ $? -eq 0 ]; then
+            log "Update staged successfully!"
+            
+            # Notificar usuário (via notify-send para todos os usuários logados)
+            for user in $(who | awk '{print $1}' | sort -u); do
+                sudo -u "$user" DISPLAY=:0 notify-send \
+                    "🎉 Pryme OS Atualizado!" \
+                    "Versão $latest_version está pronta. Reinicie para aplicar." \
+                    -u critical \
+                    -i system-software-update 2>/dev/null || true
+            done
+            
+            return 0
+        else
+            log "Error: Update failed"
+            return 1
+        fi
+    else
+        log "Error: rpm-ostree not found"
+        return 1
+    fi
+}
+
+# Main
+main() {
+    # Checar se deve verificar
+    if ! should_check && [ "${1:-}" != "--force" ]; then
+        exit 0
+    fi
+    
+    # Atualizar timestamp
+    touch "$UPDATE_CHECK_FILE"
+    
+    # Checar atualizações
+    local response=$(check_updates)
+    
+    if [ -z "$response" ]; then
+        log "No response from server"
+        exit 1
+    fi
+    
+    # Parsear JSON (usando jq se disponível, senão grep simples)
+    local update_available=$(echo "$response" | grep -o '"update_available":[^,}]*' | cut -d':' -f2 | tr -d ' "')
+    
+    if [ "$update_available" = "true" ]; then
+        local latest_version=$(echo "$response" | grep -o '"latest_version":"[^"]*"' | cut -d'"' -f4)
+        local download_url=$(echo "$response" | grep -o '"download_url":"[^"]*"' | cut -d'"' -f4)
+        local critical=$(echo "$response" | grep -o '"critical":[^,}]*' | cut -d':' -f2 | tr -d ' ')
+        
+        # Se for crítica, aplicar imediatamente
+        if [ "$critical" = "true" ]; then
+            log "CRITICAL UPDATE DETECTED!"
+            apply_update "$latest_version" "$download_url"
+        else
+            # Perguntar ao usuário via zenity/kdialog
+            if command -v zenity &> /dev/null; then
+                if zenity --question \
+                    --title="Atualização Disponível" \
+                    --text="Nova versão do Pryme OS: $latest_version\n\nDeseja atualizar agora?" \
+                    --width=400 2>/dev/null; then
+                    apply_update "$latest_version" "$download_url"
+                fi
+            elif command -v kdialog &> /dev/null; then
+                if kdialog --yesno "Nova versão do Pryme OS: $latest_version\n\nDeseja atualizar agora?" 2>/dev/null; then
+                    apply_update "$latest_version" "$download_url"
+                fi
+            else
+                # Sem GUI, aplicar automaticamente
+                apply_update "$latest_version" "$download_url"
+            fi
+        fi
+    else
+        log "System is up to date (v$CURRENT_VERSION)"
+    fi
+}
+
+main "$@"

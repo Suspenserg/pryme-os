@@ -1,0 +1,62 @@
+#!/usr/bin/bash
+# Pryme Telemetry - Collect and send system info
+
+PRYME_API="https://api.pryme.gg/v1"
+MACHINE_ID=$(cat /etc/machine-id)
+PRYME_VERSION=$(cat /usr/share/ublue-os/image-info.json | jq -r '.version')
+
+# Collect system info
+get_system_info() {
+    cat <<EOF
+{
+    "machine_id": "$MACHINE_ID",
+    "system_version": "$PRYME_VERSION",
+    "hostname": "$(hostname)",
+    "cpu": "$(lscpu | grep 'Model name' | cut -d: -f2 | xargs)",
+    "gpu": "$(lspci | grep VGA | cut -d: -f3 | xargs)",
+    "ram_gb": $(free -g | awk '/^Mem:/{print $2}'),
+    "disk_type": "$(lsblk -d -o name,rota | grep '0$' &>/dev/null && echo 'SSD' || echo 'HDD')",
+    "kernel": "$(uname -r)",
+    "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+}
+
+# Send to server (opt-in only)
+send_telemetry() {
+    if [ -f /etc/pryme/telemetry-enabled ]; then
+        curl -X POST "$PRYME_API/telemetry" \
+            -H "Content-Type: application/json" \
+            -d "$(get_system_info)" \
+            --silent --max-time 5
+    fi
+}
+
+# Report error with logs
+report_error() {
+    ERROR_TYPE="$1"
+    LOG_DATA="$2"
+    
+    curl -X POST "$PRYME_API/errors" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"machine_id\": \"$MACHINE_ID\",
+            \"error_type\": \"$ERROR_TYPE\",
+            \"log_data\": \"$LOG_DATA\",
+            \"system_info\": $(get_system_info)
+        }" \
+        --silent --max-time 10
+}
+
+case "$1" in
+    send)
+        send_telemetry
+        ;;
+    report)
+        report_error "$2" "$3"
+        ;;
+    *)
+        echo "Usage: pryme-telemetry {send|report}"
+        exit 1
+        ;;
+esac

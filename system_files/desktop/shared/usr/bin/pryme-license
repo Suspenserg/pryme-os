@@ -1,0 +1,190 @@
+#!/usr/bin/bash
+
+# Pryme OS - License Manager powered by LicenseAuth
+# https://licenseauth.help
+
+set -euo pipefail
+
+# LicenseAuth credentials
+LICENSEAUTH_NAME="PrymeOS"
+LICENSEAUTH_OWNERID="3MrJXJ9eu5"
+LICENSEAUTH_SECRET="030f1ef6bbbea2c25da627804253b86410c15f2e4d266203"
+LICENSEAUTH_VERSION="1.0"
+LICENSEAUTH_URL="https://licenseauth.help/api/1.3/"
+
+LICENSE_FILE="/etc/pryme/license.key"
+HWID_FILE="/etc/pryme/hwid"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+PURPLE='\033[0;35m'
+NC='\033[0m' # No Color
+
+# Create directories
+mkdir -p /etc/pryme
+
+# Get Hardware ID
+get_hwid() {
+    if [ -f "$HWID_FILE" ]; then
+        cat "$HWID_FILE"
+    else
+        # Generate HWID based on machine-id + MAC address
+        local machine_id=$(cat /etc/machine-id 2>/dev/null || echo "unknown")
+        local mac=$(ip link show | grep -o -E '([0-9a-f]{2}:){5}[0-9a-f]{2}' | head -n1 | tr -d ':')
+        local hwid=$(echo -n "${machine_id}${mac}" | sha256sum | cut -d' ' -f1)
+        echo "$hwid" > "$HWID_FILE"
+        echo "$hwid"
+    fi
+}
+
+# Validate license with LicenseAuth API
+validate_license() {
+    local license_key="$1"
+    local hwid=$(get_hwid)
+    
+    echo -e "${PURPLE}[Pryme OS]${NC} Validating license..."
+    
+    local response=$(curl -s -X POST "${LICENSEAUTH_URL}" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"type\": \"login\",
+            \"name\": \"${LICENSEAUTH_NAME}\",
+            \"ownerid\": \"${LICENSEAUTH_OWNERID}\",
+            \"secret\": \"${LICENSEAUTH_SECRET}\",
+            \"version\": \"${LICENSEAUTH_VERSION}\",
+            \"license\": \"${license_key}\",
+            \"hwid\": \"${hwid}\"
+        }" 2>/dev/null)
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}✗${NC} Failed to connect to LicenseAuth server"
+        return 1
+    fi
+    
+    # Parse LicenseAuth response
+    local status=$(echo "$response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+    local message=$(echo "$response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
+    
+    if [ "$status" = "success" ]; then
+        echo -e "${GREEN}✓${NC} License validated successfully!"
+        echo "$license_key" > "$LICENSE_FILE"
+        chmod 600 "$LICENSE_FILE"
+        return 0
+    else
+        echo -e "${RED}✗${NC} License validation failed: $message"
+        return 1
+    fi
+}
+
+# Check if license is valid
+check_license() {
+    if [ ! -f "$LICENSE_FILE" ]; then
+        return 1
+    fi
+    
+    local license_key=$(cat "$LICENSE_FILE")
+    validate_license "$license_key" >/dev/null 2>&1
+    return $?
+}
+
+# Activate license (interactive)
+activate_license() {
+    echo -e "${PURPLE}"
+    echo "╔══════════════════════════════════════════╗"
+    echo "║       Pryme OS License Activation       ║"
+    echo "╚══════════════════════════════════════════╝"
+    echo -e "${NC}"
+    
+    echo -e "Hardware ID: ${YELLOW}$(get_hwid)${NC}"
+    echo ""
+    echo -e "Enter your license key:"
+    read -r license_key
+    
+    if [ -z "$license_key" ]; then
+        echo -e "${RED}✗${NC} License key cannot be empty"
+        return 1
+    fi
+    
+    if validate_license "$license_key"; then
+        echo ""
+        echo -e "${GREEN}✓${NC} Pryme OS activated successfully!"
+        echo -e "${GREEN}✓${NC} You can now use all Pryme OS features."
+        return 0
+    else
+        echo ""
+        echo -e "${RED}✗${NC} Activation failed. Please check your license key."
+        return 1
+    fi
+}
+
+# Show license status
+show_status() {
+    echo -e "${PURPLE}"
+    echo "╔══════════════════════════════════════════╗"
+    echo "║         Pryme OS License Status         ║"
+    echo "╚══════════════════════════════════════════╝"
+    echo -e "${NC}"
+    
+    echo -e "Hardware ID: ${YELLOW}$(get_hwid)${NC}"
+    echo ""
+    
+    if check_license; then
+        echo -e "Status: ${GREEN}✓ ACTIVATED${NC}"
+        echo -e "License: ${GREEN}$(cat "$LICENSE_FILE")${NC}"
+    else
+        echo -e "Status: ${RED}✗ NOT ACTIVATED${NC}"
+        echo ""
+        echo "To activate Pryme OS, run:"
+        echo -e "  ${YELLOW}sudo pryme-license activate${NC}"
+    fi
+}
+
+# Deactivate license
+deactivate_license() {
+    if [ -f "$LICENSE_FILE" ]; then
+        rm -f "$LICENSE_FILE"
+        echo -e "${GREEN}✓${NC} License deactivated"
+    else
+        echo -e "${YELLOW}!${NC} No license found"
+    fi
+}
+
+# Main
+case "${1:-status}" in
+    activate)
+        activate_license
+        ;;
+    check)
+        if check_license; then
+            echo -e "${GREEN}✓${NC} License is valid"
+            exit 0
+        else
+            echo -e "${RED}✗${NC} License is invalid or not activated"
+            exit 1
+        fi
+        ;;
+    status)
+        show_status
+        ;;
+    deactivate)
+        deactivate_license
+        ;;
+    hwid)
+        echo "Hardware ID: $(get_hwid)"
+        ;;
+    *)
+        echo "Pryme OS License Manager"
+        echo ""
+        echo "Usage: pryme-license [command]"
+        echo ""
+        echo "Commands:"
+        echo "  activate    - Activate Pryme OS license"
+        echo "  check       - Check license validity"
+        echo "  status      - Show license status (default)"
+        echo "  deactivate  - Deactivate license"
+        echo "  hwid        - Show Hardware ID"
+        exit 1
+        ;;
+esac
