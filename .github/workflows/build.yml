@@ -578,20 +578,21 @@ jobs:
 
             echo "digest=${digest}" >> $GITHUB_OUTPUT
 
-      - name: Install Cosign
-        if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        with:
-          cosign-release: "v3.1.3"
+      # Signing disabled - SIGNING_SECRET not configured
+      # - name: Install Cosign
+      #   if: github.event_name != 'pull_request'
+      #   uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      #   with:
+      #     cosign-release: "v3.1.3"
 
-      - name: Sign container image
-        if: github.event_name != 'pull_request'
-        run: |
-          cosign sign -y --key env://COSIGN_PRIVATE_KEY \
-            --new-bundle-format=false --use-signing-config=false \
-            ${{ steps.base.outputs.output_image }}@${{ steps.push.outputs.digest }}
-        env:
-          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+      # - name: Sign container image
+      #   if: github.event_name != 'pull_request'
+      #   run: |
+      #     cosign sign -y --key env://COSIGN_PRIVATE_KEY \
+      #       --new-bundle-format=false --use-signing-config=false \
+      #       ${{ steps.base.outputs.output_image }}@${{ steps.push.outputs.digest }}
+      #   env:
+      #     COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
 
       - name: Install ORAS
         if: github.event_name != 'pull_request'
@@ -621,16 +622,17 @@ jobs:
 
           echo "sbom_digest=${sbom_digest}" >> $GITHUB_OUTPUT
 
-      - name: Sign SBOM OCI Artifact
-        if: github.event_name != 'pull_request'
-        env:
-          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
-          IMAGE: ${{ steps.base.outputs.output_image }}
-          SBOM_DIGEST: ${{ steps.upload-sbom.outputs.sbom_digest }}
-        run: |
-          cosign sign -y --key env://COSIGN_PRIVATE_KEY \
-            --new-bundle-format=false --use-signing-config=false \
-            ${IMAGE}@${SBOM_DIGEST}
+      # Signing disabled - SIGNING_SECRET not configured
+      # - name: Sign SBOM OCI Artifact
+      #   if: github.event_name != 'pull_request'
+      #   env:
+      #     COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+      #     IMAGE: ${{ steps.base.outputs.output_image }}
+      #     SBOM_DIGEST: ${{ steps.upload-sbom.outputs.sbom_digest }}
+      #   run: |
+      #     cosign sign -y --key env://COSIGN_PRIVATE_KEY \
+      #       --new-bundle-format=false --use-signing-config=false \
+      #       ${IMAGE}@${SBOM_DIGEST}
 
       - name: Attestation
         if: github.event_name != 'pull_request'
