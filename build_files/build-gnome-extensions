@@ -18,7 +18,7 @@ for ext_schema in \
     "/usr/share/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com/schemas" \
     "/usr/share/gnome-shell/extensions/add-to-steam@pupper.space/schemas"; do
     if [ -d "$ext_schema" ]; then
-        glib-compile-schemas "$ext_schema"
+        glib-compile-schemas "$ext_schema" || echo "Warning: Failed to compile $ext_schema"
     else
         echo "Warning: $ext_schema not found, skipping"
     fi
@@ -26,39 +26,39 @@ done
 
 # Caffeine extension
 if [ -d "/usr/share/gnome-shell/extensions/tmp/caffeine/caffeine@patapon.info" ]; then
-    mv /usr/share/gnome-shell/extensions/tmp/caffeine/caffeine@patapon.info /usr/share/gnome-shell/extensions/caffeine@patapon.info
+    mv /usr/share/gnome-shell/extensions/tmp/caffeine/caffeine@patapon.info /usr/share/gnome-shell/extensions/caffeine@patapon.info || true
 fi
 if [ -d "/usr/share/gnome-shell/extensions/caffeine@patapon.info/schemas" ]; then
-    glib-compile-schemas /usr/share/gnome-shell/extensions/caffeine@patapon.info/schemas
+    glib-compile-schemas /usr/share/gnome-shell/extensions/caffeine@patapon.info/schemas || echo "Warning: Failed to compile caffeine schemas"
 fi
 
 
 # Burn My Windows
 if [ -d "/usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com" ]; then
-    make -C /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com || true
+    (make -C /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com || echo "Warning: make failed for burn-my-windows")
     if [ -d "/usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com/schemas" ]; then
-        glib-compile-schemas /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com/schemas
+        glib-compile-schemas /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com/schemas || echo "Warning: Failed to compile burn-my-windows schemas"
     fi
     rm -f /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com/burn-my-windows@schneegans.github.com.zip
 fi
 
 # Desktop Cube
 if [ -d "/usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com" ]; then
-    make -C /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com || true
+    (make -C /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com || echo "Warning: make failed for desktop-cube")
     if [ -d "/usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com/schemas" ]; then
-        glib-compile-schemas /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com/schemas
+        glib-compile-schemas /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com/schemas || echo "Warning: Failed to compile desktop-cube schemas"
     fi
     rm -f /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com/desktop-cube@schneegans.github.com.zip
 fi
 
 # Blur My Shell
 if [ -d "/usr/share/gnome-shell/extensions/blur-my-shell@aunetx" ]; then
-    make -C /usr/share/gnome-shell/extensions/blur-my-shell@aunetx || true
+    (make -C /usr/share/gnome-shell/extensions/blur-my-shell@aunetx || echo "Warning: make failed for blur-my-shell")
     if [ -f "/usr/share/gnome-shell/extensions/blur-my-shell@aunetx/build/blur-my-shell@aunetx.shell-extension.zip" ]; then
-        unzip -o /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/build/blur-my-shell@aunetx.shell-extension.zip -d /usr/share/gnome-shell/extensions/blur-my-shell@aunetx
+        unzip -o /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/build/blur-my-shell@aunetx.shell-extension.zip -d /usr/share/gnome-shell/extensions/blur-my-shell@aunetx || true
     fi
     if [ -d "/usr/share/gnome-shell/extensions/blur-my-shell@aunetx/schemas" ]; then
-        glib-compile-schemas /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/schemas
+        glib-compile-schemas /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/schemas || echo "Warning: Failed to compile blur-my-shell schemas"
     fi
     rm -rf /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/build
 fi
@@ -66,23 +66,31 @@ fi
 # Bazaar Integration
 if [ -d "/usr/share/gnome-shell/extensions/tmp/bazaar-integration@kolunmi.github.io/src" ]; then
     mkdir -p /usr/share/gnome-shell/extensions/bazaar-integration@kolunmi.github.io
-    mv /usr/share/gnome-shell/extensions/tmp/bazaar-integration@kolunmi.github.io/src/* /usr/share/gnome-shell/extensions/bazaar-integration@kolunmi.github.io/ || true
+    (mv /usr/share/gnome-shell/extensions/tmp/bazaar-integration@kolunmi.github.io/src/* /usr/share/gnome-shell/extensions/bazaar-integration@kolunmi.github.io/ 2>/dev/null || echo "Warning: Failed to move bazaar-integration")
 fi
 
-# TouchUp
-if command -v /ctx/ghcurl &> /dev/null; then
-    touchup_url=$(/ctx/ghcurl https://api.github.com/repos/mityax/gnome-extension-touchup/releases/latest 2>/dev/null | jq -r '.assets[] | select(.name | test(".*\\.shell-extension\\.zip$")).browser_download_url' 2>/dev/null || echo "")
-    if [ -n "$touchup_url" ]; then
-        /ctx/ghcurl "$touchup_url" -Lo /tmp/touchup.zip && \
-        mkdir -p /usr/share/gnome-shell/extensions/touchup@mityax && \
-        unzip -o /tmp/touchup.zip -d /usr/share/gnome-shell/extensions/touchup@mityax && \
-        if [ -d "/usr/share/gnome-shell/extensions/touchup@mityax/schemas" ]; then
-            glib-compile-schemas /usr/share/gnome-shell/extensions/touchup@mityax/schemas
-        fi && \
-        rm -f /tmp/touchup.zip
+# TouchUp - simplified to avoid complex subshell issues
+if [ -x "/ctx/ghcurl" ]; then
+    echo "Attempting to download TouchUp extension..."
+    (/ctx/ghcurl https://api.github.com/repos/mityax/gnome-extension-touchup/releases/latest 2>/dev/null | jq -r '.assets[] | select(.name | test(".*\\.shell-extension\\.zip$")).browser_download_url' > /tmp/touchup_url.txt 2>/dev/null || echo "") && \
+    touchup_url=$(cat /tmp/touchup_url.txt 2>/dev/null || echo "") && \
+    if [ -n "$touchup_url" ] && [ "$touchup_url" != "null" ]; then
+        /ctx/ghcurl "$touchup_url" -Lo /tmp/touchup.zip 2>/dev/null && \
+        if [ -f /tmp/touchup.zip ]; then
+            mkdir -p /usr/share/gnome-shell/extensions/touchup@mityax && \
+            unzip -o /tmp/touchup.zip -d /usr/share/gnome-shell/extensions/touchup@mityax 2>/dev/null && \
+            if [ -d "/usr/share/gnome-shell/extensions/touchup@mityax/schemas" ]; then
+                glib-compile-schemas /usr/share/gnome-shell/extensions/touchup@mityax/schemas || echo "Warning: Failed to compile touchup schemas"
+            fi
+            rm -f /tmp/touchup.zip /tmp/touchup_url.txt
+        else
+            echo "Warning: Failed to download TouchUp extension"
+        fi
     else
-        echo "Warning: Could not fetch TouchUp extension, skipping"
+        echo "Warning: Could not get TouchUp download URL, skipping"
     fi
+else
+    echo "Warning: ghcurl not available, skipping TouchUp"
 fi
 
 # Cleanup
