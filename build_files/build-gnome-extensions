@@ -34,31 +34,56 @@ fi
 
 
 # Burn My Windows
-make -C /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com
-glib-compile-schemas /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com/schemas
-rm /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com/burn-my-windows@schneegans.github.com.zip
+if [ -d "/usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com" ]; then
+    make -C /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com || true
+    if [ -d "/usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com/schemas" ]; then
+        glib-compile-schemas /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com/schemas
+    fi
+    rm -f /usr/share/gnome-shell/extensions/burn-my-windows@schneegans.github.com/burn-my-windows@schneegans.github.com.zip
+fi
 
 # Desktop Cube
-make -C /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com
-glib-compile-schemas /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com/schemas
-rm /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com/desktop-cube@schneegans.github.com.zip
+if [ -d "/usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com" ]; then
+    make -C /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com || true
+    if [ -d "/usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com/schemas" ]; then
+        glib-compile-schemas /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com/schemas
+    fi
+    rm -f /usr/share/gnome-shell/extensions/desktop-cube@schneegans.github.com/desktop-cube@schneegans.github.com.zip
+fi
 
 # Blur My Shell
-make -C /usr/share/gnome-shell/extensions/blur-my-shell@aunetx
-unzip -o /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/build/blur-my-shell@aunetx.shell-extension.zip -d /usr/share/gnome-shell/extensions/blur-my-shell@aunetx
-glib-compile-schemas /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/schemas
-rm -rf /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/build
+if [ -d "/usr/share/gnome-shell/extensions/blur-my-shell@aunetx" ]; then
+    make -C /usr/share/gnome-shell/extensions/blur-my-shell@aunetx || true
+    if [ -f "/usr/share/gnome-shell/extensions/blur-my-shell@aunetx/build/blur-my-shell@aunetx.shell-extension.zip" ]; then
+        unzip -o /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/build/blur-my-shell@aunetx.shell-extension.zip -d /usr/share/gnome-shell/extensions/blur-my-shell@aunetx
+    fi
+    if [ -d "/usr/share/gnome-shell/extensions/blur-my-shell@aunetx/schemas" ]; then
+        glib-compile-schemas /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/schemas
+    fi
+    rm -rf /usr/share/gnome-shell/extensions/blur-my-shell@aunetx/build
+fi
 
 # Bazaar Integration
-mkdir -p /usr/share/gnome-shell/extensions/bazaar-integration@kolunmi.github.io
-mv /usr/share/gnome-shell/extensions/tmp/bazaar-integration@kolunmi.github.io/src/* /usr/share/gnome-shell/extensions/bazaar-integration@kolunmi.github.io/
+if [ -d "/usr/share/gnome-shell/extensions/tmp/bazaar-integration@kolunmi.github.io/src" ]; then
+    mkdir -p /usr/share/gnome-shell/extensions/bazaar-integration@kolunmi.github.io
+    mv /usr/share/gnome-shell/extensions/tmp/bazaar-integration@kolunmi.github.io/src/* /usr/share/gnome-shell/extensions/bazaar-integration@kolunmi.github.io/ || true
+fi
 
 # TouchUp
-/ctx/ghcurl "$(/ctx/ghcurl https://api.github.com/repos/mityax/gnome-extension-touchup/releases/latest | jq -r '.assets[] | select(.name | test(".*\\.shell-extension\\.zip$")).browser_download_url')" -Lo /tmp/touchup.zip
-mkdir -p /usr/share/gnome-shell/extensions/touchup@mityax
-unzip -o /tmp/touchup.zip -d /usr/share/gnome-shell/extensions/touchup@mityax
-glib-compile-schemas /usr/share/gnome-shell/extensions/touchup@mityax/schemas
-rm /tmp/touchup.zip
+if command -v /ctx/ghcurl &> /dev/null; then
+    touchup_url=$(/ctx/ghcurl https://api.github.com/repos/mityax/gnome-extension-touchup/releases/latest 2>/dev/null | jq -r '.assets[] | select(.name | test(".*\\.shell-extension\\.zip$")).browser_download_url' 2>/dev/null || echo "")
+    if [ -n "$touchup_url" ]; then
+        /ctx/ghcurl "$touchup_url" -Lo /tmp/touchup.zip && \
+        mkdir -p /usr/share/gnome-shell/extensions/touchup@mityax && \
+        unzip -o /tmp/touchup.zip -d /usr/share/gnome-shell/extensions/touchup@mityax && \
+        if [ -d "/usr/share/gnome-shell/extensions/touchup@mityax/schemas" ]; then
+            glib-compile-schemas /usr/share/gnome-shell/extensions/touchup@mityax/schemas
+        fi && \
+        rm -f /tmp/touchup.zip
+    else
+        echo "Warning: Could not fetch TouchUp extension, skipping"
+    fi
+fi
 
 # Cleanup
 dnf5 -y remove glib2-devel
