@@ -19,7 +19,8 @@ mount -o remount,rw /proc/sys
 
 # Install flatpaks
 curl --retry 3 -Lo /etc/flatpak/remotes.d/flathub.flatpakrepo https://dl.flathub.org/repo/flathub.flatpakrepo
-xargs -r flatpak install -y --noninteractive <"/src/$FLATPAK_DIR_SHORTNAME/flatpaks"
+flatpak remote-add --if-not-exists flathub /etc/flatpak/remotes.d/flathub.flatpakrepo
+bash "$SCRIPT_DIR/install-listed-flatpaks.sh" "/src/$FLATPAK_DIR_SHORTNAME/flatpaks"
 
 # Pull the container image to be installed
 if mountpoint -q /usr/lib/containers/storage; then

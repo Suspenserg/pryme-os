@@ -74,7 +74,6 @@ fi
 TEMP_FLATPAK_INSTALL_DIR=$(mktemp -d -p "${project_root}" flatpak.XXX)
 # Get list of refs from directory
 FLATPAK_REFS_DIR=${project_root}/${flatpak_dir_shortname}
-FLATPAK_REFS_DIR_LIST=$(tr '\n' ' ' < "${FLATPAK_REFS_DIR}/flatpaks")
 
 # Generate install script
 cat << EOF > "${TEMP_FLATPAK_INSTALL_DIR}/script.sh"
@@ -83,10 +82,12 @@ mkdir -p /flatpak/flatpak /flatpak/triggers
 mkdir /var/tmp || true
 chmod -R 1777 /var/tmp
 flatpak config --system --set languages "*"
-flatpak remote-add --system flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install --system -y ${FLATPAK_REFS_DIR_LIST}
+flatpak remote-add --system --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+bash /temp_flatpak_install_dir/install-listed-flatpaks.sh --system /temp_flatpak_install_dir/flatpaks
 ostree refs --repo=\${FLATPAK_SYSTEM_DIR}/repo | grep '^deploy/' | grep -v 'org\.freedesktop\.Platform\.openh264' | sed 's/^deploy\///g' > /output/flatpaks_with_deps
 EOF
+cp "${project_root}/installer/install-listed-flatpaks.sh" "${TEMP_FLATPAK_INSTALL_DIR}/install-listed-flatpaks.sh"
+cp "${FLATPAK_REFS_DIR}/flatpaks" "${TEMP_FLATPAK_INSTALL_DIR}/flatpaks"
 
 workspace=${project_root}
 if [[ -f /.dockerenv || -f /run/.containerenv ]]; then

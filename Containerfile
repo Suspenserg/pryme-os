@@ -62,11 +62,12 @@ ARG VERSION_TAG="${VERSION_TAG}"
 ARG VERSION_PRETTY="${VERSION_PRETTY}"
 
 COPY system_files/desktop/shared/ system_files/desktop/${BASE_IMAGE_NAME}/ /
+COPY --chmod=0755 system_files/desktop/shared/usr/bin/dconf-override-converter /usr/bin/dconf-override-converter
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     /ctx/restore-exec && \
     find /usr/share/ublue-os/docs -type f -exec setfattr -n user.component -v "ublue-docs" {} +
 
-# Pin linux-firmware to a known-good version
+# Pin linux-firmware to a known-good version (keep NVIDIA firmware on the same pin)
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/cache/libdnf5 \
     --mount=type=cache,dst=/var/log \
@@ -74,9 +75,10 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=tmpfs,dst=/tmp \
     firmware_ok=0 && \
     for _try in 1 2 3 4 5; do \
-        dnf5 -y install --best --allowerasing \
+        dnf5 -y --setopt=retries=10 --setopt=timeout=90 install --best --allowerasing \
             "linux-firmware-${LINUX_FIRMWARE_VERSION}*" \
-            "linux-firmware-whence-${LINUX_FIRMWARE_VERSION}*" && firmware_ok=1 && break; \
+            "linux-firmware-whence-${LINUX_FIRMWARE_VERSION}*" \
+            "nvidia-gpu-firmware-${LINUX_FIRMWARE_VERSION}*" && firmware_ok=1 && break; \
         echo "linux-firmware install failed (attempt ${_try}/5), retrying..." && \
         sleep $((_try * 15)); \
     done && \

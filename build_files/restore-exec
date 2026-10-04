@@ -5,6 +5,13 @@ set -euo pipefail
 # /usr/sbin (merged with /usr/bin), so a missing +x becomes:
 #   /usr/sbin/dconf-override-converter: Permission denied  (exit 126)
 
+if [[ -e /usr/bin/dconf-override-converter ]]; then
+    chmod 0755 /usr/bin/dconf-override-converter
+fi
+if [[ -e /usr/sbin/dconf-override-converter ]]; then
+    chmod 0755 /usr/sbin/dconf-override-converter
+fi
+
 while IFS= read -r -d '' f; do
     if [[ "$(head -c 2 "${f}" 2>/dev/null || true)" == '#!' ]]; then
         chmod 0755 "${f}"
