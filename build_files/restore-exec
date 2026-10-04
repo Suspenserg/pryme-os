@@ -1,0 +1,12 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+# Windows git checkouts often store scripts as 0644. Fedora PATH prefers
+# /usr/sbin (merged with /usr/bin), so a missing +x becomes:
+#   /usr/sbin/dconf-override-converter: Permission denied  (exit 126)
+
+while IFS= read -r -d '' f; do
+    if [[ "$(head -c 2 "${f}" 2>/dev/null || true)" == '#!' ]]; then
+        chmod 0755 "${f}"
+    fi
+done < <(find /usr/bin /usr/sbin /usr/libexec -type f ! -perm -0111 -print0 2>/dev/null)
