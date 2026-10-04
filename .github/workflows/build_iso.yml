@@ -167,10 +167,7 @@ jobs:
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_SECRET }}
           ISO_UPLOAD_DIR: ${{ steps.upload-directory.outputs.iso-upload-dir }}
-        run: |
-          for iso in ${ISO_UPLOAD_DIR}/*.iso; do
-            cosign sign-blob -y --key env://SIGNING_KEY "$iso" --output-signature "${iso}.sig"
-          done
+        run: bash just_scripts/sign-iso-blobs.sh
 
       - name: Attest Build Provenance
         id: attest
