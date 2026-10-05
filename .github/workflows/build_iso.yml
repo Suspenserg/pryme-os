@@ -159,17 +159,30 @@ jobs:
           echo "iso-upload-dir=${ISO_UPLOAD_DIR}" >> $GITHUB_OUTPUT
 
       - name: Setup Cosign
+        continue-on-error: true
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
           cosign-release: 'v2.6.5'
 
       - name: Sign ISO
+        continue-on-error: true
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_SECRET }}
           ISO_UPLOAD_DIR: ${{ steps.upload-directory.outputs.iso-upload-dir }}
-        run: bash just_scripts/sign-iso-blobs.sh
+        run: |
+          set -euo pipefail
+          if [[ -z "${SIGNING_KEY:-}" ]] || ! grep -qE 'BEGIN ([A-Z0-9-]+ )?PRIVATE KEY' <<<"${SIGNING_KEY}"; then
+            echo "SIGNING_SECRET missing or not a Cosign PEM key; skipping ISO signatures."
+            exit 0
+          fi
+          if [[ -f just_scripts/sign-iso-blobs.sh ]]; then
+            bash just_scripts/sign-iso-blobs.sh
+          else
+            echo "sign-iso-blobs.sh not found; skipping ISO signatures."
+          fi
 
       - name: Attest Build Provenance
+        continue-on-error: true
         id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
