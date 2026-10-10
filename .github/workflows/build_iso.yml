@@ -202,11 +202,27 @@ jobs:
               '{iso: $iso, attestation_url: $url, build_date: $date}' > "${iso}.json"
           done
 
+      - name: Check R2 upload configuration
+        id: r2-config
+        if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main'
+        shell: bash
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT || vars.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          if [[ -n "${R2_ENDPOINT:-}" && -n "${R2_ACCESS_KEY_ID:-}" && -n "${R2_SECRET_ACCESS_KEY:-}" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::R2 is not configured; this ISO will be available as a GitHub Actions artifact for 1 day."
+          fi
+
       - name: Upload ISOs and Checksum to Job Artifacts
-        if: github.ref_name == 'testing' || github.ref_name == 'unstable'
+        if: github.ref_name == 'testing' || github.ref_name == 'unstable' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'main' && steps.r2-config.outputs.configured != 'true')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: ${{ matrix.image_name }}-${{ steps.generate-tag.outputs.tag }}-${{ matrix.major_version}}
+          name: ${{ matrix.image_name }}-${{ steps.generate-tag.outputs.tag }}
           path: ${{ steps.upload-directory.outputs.iso-upload-dir }}
           if-no-files-found: error
           retention-days: 1
@@ -214,7 +230,7 @@ jobs:
           overwrite: true
 
       - name: Upload ISOs and Checksum to R2
-        if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main'
+        if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main' && steps.r2-config.outputs.configured == 'true'
         shell: bash
         env:
           RCLONE_CONFIG_R2_TYPE: s3
