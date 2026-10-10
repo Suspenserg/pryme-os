@@ -33,6 +33,11 @@ on:
     inputs:
       handwritten:
         description: "Small changelog:"
+      build_live_iso:
+        description: "Build Live ISOs after publishing the project images."
+        required: false
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -55,6 +60,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Validate R2 secrets for Live ISO build
+        if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main' && inputs.build_live_iso
+        shell: bash
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${R2_ENDPOINT:-}" ]]; then
+            echo "::error::R2_ENDPOINT is missing. Set it to https://<account-id>.r2.cloudflarestorage.com in the repository Actions secrets."
+            exit 1
+          fi
+          if [[ -z "${R2_ACCESS_KEY_ID:-}" || -z "${R2_SECRET_ACCESS_KEY:-}" ]]; then
+            echo "::error::R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be configured in the repository Actions secrets."
+            exit 1
+          fi
 
       - name: Generate version tag
         id: generate
@@ -650,6 +673,19 @@ jobs:
       contents: write
     secrets: inherit
     uses: ./.github/workflows/generate_release.yml
+
+  build_live_iso:
+    name: Build Live ISOs
+    needs: [push-ghcr]
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'main' && inputs.build_live_iso
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    secrets: inherit
+    uses: ./.github/workflows/build_iso.yml
 
   kickoff_gamemode_news:
     name: Build Game Mode Announcements
