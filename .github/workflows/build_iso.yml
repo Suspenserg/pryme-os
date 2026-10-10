@@ -222,9 +222,20 @@ jobs:
           RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           RCLONE_CONFIG_R2_REGION: auto
-          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT || vars.R2_ENDPOINT }}
           SOURCE_DIR: ${{ steps.upload-directory.outputs.iso-upload-dir }}
         run: |
+          set -euo pipefail
+
+          if [[ -z "${RCLONE_CONFIG_R2_ENDPOINT:-}" ]]; then
+            echo "::error::R2_ENDPOINT is missing. Add it as an Actions secret or variable, with value https://<account-id>.r2.cloudflarestorage.com."
+            exit 1
+          fi
+          if [[ -z "${RCLONE_CONFIG_R2_ACCESS_KEY_ID:-}" || -z "${RCLONE_CONFIG_R2_SECRET_ACCESS_KEY:-}" ]]; then
+            echo "::error::R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be configured as Actions secrets."
+            exit 1
+          fi
+
           sudo apt-get update
           sudo apt-get install -y rclone
-          rclone copy $SOURCE_DIR R2:bazzite
+          rclone copy "$SOURCE_DIR" R2:bazzite
