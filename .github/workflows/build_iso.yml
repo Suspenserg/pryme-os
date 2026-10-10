@@ -225,6 +225,17 @@ jobs:
           RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           SOURCE_DIR: ${{ steps.upload-directory.outputs.iso-upload-dir }}
         run: |
+          set -euo pipefail
+
+          if [[ -z "${RCLONE_CONFIG_R2_ENDPOINT:-}" ]]; then
+            echo "::error::R2_ENDPOINT is missing. Set it to https://<account-id>.r2.cloudflarestorage.com in the repository Actions secrets."
+            exit 1
+          fi
+          if [[ -z "${RCLONE_CONFIG_R2_ACCESS_KEY_ID:-}" || -z "${RCLONE_CONFIG_R2_SECRET_ACCESS_KEY:-}" ]]; then
+            echo "::error::R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be configured in the repository Actions secrets."
+            exit 1
+          fi
+
           sudo apt-get update
           sudo apt-get install -y rclone
-          rclone copy $SOURCE_DIR R2:bazzite
+          rclone copy "$SOURCE_DIR" R2:bazzite
